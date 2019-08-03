@@ -1,8 +1,4 @@
 use nom::*;
-
-#[cfg(feature = "hashbrown")]
-use hashbrown::HashMap;
-#[cfg(not(feature = "hashbrown"))]
 use std::collections::HashMap;
 
 #[derive(Clone, Debug, PartialEq, Hash)]
