@@ -1,4 +1,5 @@
 use nom::*;
+use nom::character::complete::digit1;
 use std::collections::HashMap;
 
 #[derive(Clone, Debug, PartialEq, Hash)]
@@ -23,7 +24,7 @@ impl<'a> std::hash::Hash for Bencode<'a> {
 
 impl<'a> Eq for Bencode<'a> {}
 
-type BencodeParseResult<'a> = Result<(&'a [u8], Bencode<'a>), nom::Err<&'a [u8]>>;
+type BencodeParseResult<'a> = Result<(&'a [u8], Bencode<'a>), nom::Err<(&'a [u8], nom::error::ErrorKind)>>;
 
 pub fn parse_bytes(b: &[u8]) -> BencodeParseResult {
     any(b)
@@ -100,7 +101,7 @@ named!(
 
 named!(
     any<crate::Bencode>,
-    alt_complete!(string | int | list | dict)
+    alt!(string | int | list | dict)
 );
 
 #[cfg(test)]
