@@ -1,5 +1,10 @@
-use nom::*;
+use nom::branch::alt;
+use nom::bytes::complete::{tag, take};
 use nom::character::complete::digit1;
+use nom::combinator::{complete, map, opt};
+use nom::multi::{fold_many0, many0};
+use nom::sequence::{pair, preceded, terminated};
+use nom::*;
 use std::collections::HashMap;
 
 #[derive(Clone, Debug, PartialEq, Hash)]
@@ -24,39 +29,36 @@ impl<'a> std::hash::Hash for Bencode<'a> {
 
 impl<'a> Eq for Bencode<'a> {}
 
-type BencodeParseResult<'a> = Result<(&'a [u8], Bencode<'a>), nom::Err<(&'a [u8], nom::error::ErrorKind)>>;
+type BencodeParseResult<'a> =
+    Result<(&'a [u8], Bencode<'a>), nom::Err<(&'a [u8], nom::error::ErrorKind)>>;
 
 pub fn parse_bytes(b: &[u8]) -> BencodeParseResult {
     any(b)
 }
 
-named!(
-    string<crate::Bencode>,
-    do_parse!(
-        prefix: map!(digit1, |bytes| {
-            let n: isize = std::str::from_utf8(bytes)
-                .expect("not utf8")
-                .parse()
-                .expect("not a number");
-            n
-        }) >> tag!(":")
-            >> bytes: take!(prefix)
-            >> (match std::str::from_utf8(bytes) {
-                Ok(s) => Bencode::Str(BencodeString::String(s)),
-                Err(_e) => Bencode::Str(BencodeString::RawBytes(bytes)),
-            })
-    )
-);
+fn string(s: &[u8]) -> IResult<&[u8], Bencode> {
+    let (s, prefix) = map(digit1, |bytes| {
+        let n: usize = std::str::from_utf8(bytes)
+            .expect("not utf8")
+            .parse()
+            .expect("not a number");
+        n
+    })(s)?;
 
-named!(
-    int<crate::Bencode>,
-    do_parse!(
-        i: map!(
-            preceded!(
-                tag!("i"),
-                terminated!(pair!(opt!(tag!("-")), digit1), tag!("e"))
-            ),
-            |(sign_maybe, bytes)| if let Some(sign) = sign_maybe {
+    let (s, _) = tag(":")(s)?;
+    let (s, bytes) = take(prefix)(s)?;
+
+    (match std::str::from_utf8(bytes) {
+        Ok(string) => Ok((s, Bencode::Str(BencodeString::String(string)))),
+        Err(_e) => Ok((s, Bencode::Str(BencodeString::RawBytes(bytes)))),
+    })
+}
+
+fn int(s: &[u8]) -> IResult<&[u8], Bencode> {
+    let (s, int) = map(
+        preceded(tag("i"), terminated(pair(opt(tag("-")), digit1), tag("e"))),
+        |(sign_maybe, bytes): (Option<&[u8]>, &[u8])| {
+            if let Some(sign) = sign_maybe {
                 {
                     let c = &[sign, bytes].concat();
                     std::str::from_utf8(c)
@@ -70,39 +72,42 @@ named!(
                     .parse()
                     .expect("not an int")
             }
-        ) >> (Bencode::Int(i))
-    )
-);
+        },
+    )(s)?;
 
-named!(
-    list<crate::Bencode>,
-    do_parse!(l: preceded!(tag!("l"), terminated!(many0!(any), tag!("e"))) >> (Bencode::List(l)))
-);
+    Ok((s, Bencode::Int(int)))
+}
 
-named!(
-    dict<crate::Bencode>,
-    do_parse!(
-        dict: preceded!(
-            tag!("d"),
-            terminated!(
-                fold_many0!(
-                    pair!(string, any),
-                    HashMap::new(),
-                    |mut acc: HashMap<_, _>, (k, v)| {
-                        acc.insert(k, v);
-                        acc
-                    }
-                ),
-                tag!("e")
-            )
-        ) >> (Bencode::Dict(dict))
-    )
-);
+fn list(s: &[u8]) -> IResult<&[u8], Bencode> {
+    let (s, list) = preceded(tag("l"), terminated(many0(any), tag("e")))(s)?;
 
-named!(
-    any<crate::Bencode>,
-    alt!(string | int | list | dict)
-);
+    Ok((s, Bencode::List(list)))
+}
+
+fn dict(s: &[u8]) -> IResult<&[u8], Bencode> {
+    let (s, dict) = preceded(
+        tag("d"),
+        terminated(
+            fold_many0(
+                pair(string, any),
+                HashMap::new(),
+                |mut acc: HashMap<_, _>, (k, v)| {
+                    acc.insert(k, v);
+                    acc
+                },
+            ),
+            tag("e"),
+        ),
+    )(s)?;
+
+    Ok((s, Bencode::Dict(dict)))
+}
+
+fn any(s: &[u8]) -> IResult<&[u8], Bencode> {
+    let (s, b) = complete(alt((string, int, list, dict)))(s)?;
+
+    Ok((s, b))
+}
 
 #[cfg(test)]
 mod tests {
