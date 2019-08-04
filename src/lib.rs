@@ -13,18 +13,12 @@ pub enum BencodeString<'a> {
     RawBytes(&'a [u8]),
 }
 
-impl<'a> Eq for BencodeString<'a> {}
-
 #[derive(Clone, Debug, PartialEq)]
 pub enum Bencode<'a> {
     Str(BencodeString<'a>),
     Int(isize),
     List(Vec<Bencode<'a>>),
-    Dict(HashMap<Bencode<'a>, Bencode<'a>>),
-}
-
-impl<'a> std::hash::Hash for Bencode<'a> {
-    fn hash<H>(&self, _state: &mut H) {}
+    Dict(HashMap<&'a str, Bencode<'a>>),
 }
 
 impl<'a> Eq for Bencode<'a> {}
@@ -92,7 +86,11 @@ fn dict(s: &[u8]) -> IResult<&[u8], Bencode> {
                 pair(string, any),
                 HashMap::new(),
                 |mut acc: HashMap<_, _>, (k, v)| {
-                    acc.insert(k, v);
+                    let utf8_str = match k {
+                        Bencode::Str(BencodeString::String(utf8_str)) => utf8_str,
+                        _ => panic!("Dict keys must be UTF-8 strings"),
+                    };
+                    acc.insert(utf8_str, v);
                     acc
                 },
             ),
@@ -165,9 +163,9 @@ mod tests {
             dict(b"d3:cow7:pigletse"),
             Ok((
                 vec![].as_bytes(),
-                Dict(hashmap![Str(String("cow")), Str(String("piglets"))])
+                Dict(hashmap!["cow", Str(String("piglets"))])
             ))
-        )
+        );
     }
 
     #[test]
@@ -184,28 +182,28 @@ mod tests {
             Ok((
                 vec![].as_bytes(),
                 Dict(hashmap![
-                    Str(String("announce")),
+                    "announce",
                     Str(String("http://torrent.ubuntu.com:6969/announce")),
-                    Str(String("announce-list")),
+                    "announce-list",
                     List(vec![
                         List(vec![Str(String("http://torrent.ubuntu.com:6969/announce"))]),
                         List(vec![Str(String(
                             "http://ipv6.torrent.ubuntu.com:6969/announce"
                         ))])
                     ]),
-                    Str(String("comment")),
+                    "comment",
                     Str(String("Ubuntu CD releases.ubuntu.com")),
-                    Str(String("creation date")),
+                    "creation date",
                     Int(1455826371),
-                    Str(String("info")),
+                    "info",
                     Dict(hashmap![
-                        Str(String("length")),
+                        "length",
                         Int(1069547520),
-                        Str(String("name")),
+                        "name",
                         Str(String("ubuntu-14.04.4-desktop-amd64.iso")),
-                        Str(String("piece length")),
+                        "piece length",
                         Int(524288),
-                        Str(String("pieces")),
+                        "pieces",
                         Str(RawBytes(&[
                             109, 235, 143, 234, 36, 25, 142, 36, 20, 3, 227, 227, 134, 136, 205,
                             130, 176, 104, 192, 33, 45, 230, 152, 2, 239, 131, 240, 217, 180, 251,
