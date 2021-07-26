@@ -5,7 +5,7 @@ authors = ["Clark Kampfe <clark.kampfe@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-nom = "6.2.1"
+nom = "7.0.0-alpha1"
 
 [dev-dependencies]
 criterion = "0.3"
