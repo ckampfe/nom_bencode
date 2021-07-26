@@ -17,10 +17,11 @@ pub enum Bencode<'a> {
 
 impl<'a> Eq for Bencode<'a> {}
 
-type DecodeResult<'a> = Result<(&'a [u8], Bencode<'a>), nom::error::Error<&'a [u8]>>;
+type DecodeResult<'a> = Result<Bencode<'a>, nom::error::Error<&'a [u8]>>;
 
 pub fn decode(b: &[u8]) -> DecodeResult {
-    any(b).finish()
+    let (_s, o) = any(b).finish()?;
+    Ok(o)
 }
 
 fn string(s: &[u8]) -> IResult<&[u8], Bencode> {
