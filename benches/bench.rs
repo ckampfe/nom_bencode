@@ -13,7 +13,7 @@ fn ubuntu(c: &mut Criterion) {
 
     torrent.read_to_end(&mut buf).unwrap();
 
-    c.bench_function("ubuntu", move |b| b.iter(|| nom_bencode::parse_bytes(&buf)));
+    c.bench_function("ubuntu", move |b| b.iter(|| nom_bencode::decode(&buf)));
 }
 
 criterion_group!(benches, ubuntu);

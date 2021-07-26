@@ -5,17 +5,16 @@ authors = ["Clark Kampfe <clark.kampfe@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-nom = "5.0"
+nom = "6.2"
 
 [dev-dependencies]
 criterion = "0.3"
-
-[profile.release]
-opt-level = 3
-lto = true
-codegen-units = 1
 
 [[bench]]
 name = "bench"
 harness = false
 
+[profile.bench]
+codegen-units = 1
+lto = true
+opt-level = 3
