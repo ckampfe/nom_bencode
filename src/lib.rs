@@ -24,3 +24,25 @@ impl Bencode {
         encode::encode(&self)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::io::Read;
+
+    #[test]
+    fn roundtrip() {
+        let mut f =
+            std::fs::File::open("./fixtures/ubuntu-14.04.4-desktop-amd64.iso.torrent").unwrap();
+        let mut buf = vec![];
+        f.read_to_end(&mut buf).unwrap();
+
+        let result = crate::decode(&buf);
+
+        // it decodes
+        assert!(result.is_ok());
+        let bencode = result.unwrap();
+
+        // and the reencoded for is the same as the original bytes
+        assert_eq!(bencode.encode(), buf);
+    }
+}
