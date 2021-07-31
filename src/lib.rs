@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, fmt::Display};
 
 mod decode;
 mod encode;
@@ -21,7 +21,40 @@ pub fn decode(b: &[u8]) -> DecodeResult {
 
 impl Bencode {
     pub fn encode(&self) -> Vec<u8> {
-        encode::encode(&self)
+        encode::encode(self)
+    }
+}
+
+impl Display for Bencode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Bencode::String(bytes) => match std::str::from_utf8(bytes) {
+                Ok(s) => {
+                    write!(f, "{}", s)
+                }
+                Err(_) => write!(f, "{:?}", bytes),
+            },
+            Bencode::Integer(i) => write!(f, "{}", i),
+            Bencode::List(l) => {
+                for element in l {
+                    write!(f, "{}", element.to_string())?;
+                }
+                Ok(())
+            }
+            Bencode::Dictionary(map) => {
+                for (k, v) in map {
+                    match std::str::from_utf8(k) {
+                        Ok(s) => {
+                            write!(f, "({} => {})", s.to_string(), v.to_string())?;
+                        }
+                        Err(_) => {
+                            write!(f, "({:?} => {})", k, v.to_string())?;
+                        }
+                    }
+                }
+                Ok(())
+            }
+        }
     }
 }
 
