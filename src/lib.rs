@@ -23,6 +23,38 @@ impl Bencode {
     pub fn encode(&self) -> Vec<u8> {
         encode::encode(&self)
     }
+
+    pub fn unwrap_string(&self) -> String {
+        if let Self::String(s) = self {
+            std::str::from_utf8(s).unwrap().to_string()
+        } else {
+            panic!()
+        }
+    }
+
+    pub fn unwrap_bytes(&self) -> Vec<u8> {
+        if let Self::String(s) = self {
+            s.to_owned()
+        } else {
+            panic!()
+        }
+    }
+
+    pub fn unwrap_integer(&self) -> isize {
+        if let Self::Integer(i) = self {
+            *i
+        } else {
+            panic!()
+        }
+    }
+
+    pub fn unwrap_dictionary(&self) -> BTreeMap<Vec<u8>, Bencode> {
+        if let Self::Dictionary(d) = self {
+            d.to_owned()
+        } else {
+            panic!()
+        }
+    }
 }
 
 #[cfg(test)]
