@@ -21,7 +21,7 @@ pub fn decode(b: &[u8]) -> DecodeResult {
 
 impl Bencode {
     pub fn encode(&self) -> Vec<u8> {
-        encode::encode(&self)
+        encode::encode(self)
     }
 
     pub fn unwrap_string(&self) -> String {
