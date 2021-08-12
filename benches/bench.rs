@@ -1,7 +1,4 @@
-#[macro_use]
-extern crate criterion;
-
-use criterion::Criterion;
+use criterion::{criterion_group, criterion_main, Criterion};
 use nom_bencode;
 use std::io::Read;
 
@@ -16,5 +13,12 @@ fn ubuntu(c: &mut Criterion) {
     c.bench_function("ubuntu", move |b| b.iter(|| nom_bencode::decode(&buf)));
 }
 
-criterion_group!(benches, ubuntu);
+fn decode_integer(c: &mut Criterion) {
+    let buf = b"i-204156622e";
+    c.bench_function("decode_integer", move |b| {
+        b.iter(|| nom_bencode::decode(buf))
+    });
+}
+
+criterion_group!(benches, ubuntu, decode_integer);
 criterion_main!(benches);
