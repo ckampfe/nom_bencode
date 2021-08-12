@@ -45,19 +45,15 @@ fn decode_integer(s: &[u8]) -> IResult<&[u8], Bencode> {
     let (s, int) = map(
         preceded(tag("i"), terminated(pair(opt(tag("-")), digit1), tag("e"))),
         |(sign_maybe, bytes): (Option<&[u8]>, &[u8])| {
-            if let Some(sign) = sign_maybe {
-                {
-                    let c = &[sign, bytes].concat();
-                    std::str::from_utf8(c)
-                        .expect("not utf8")
-                        .parse()
-                        .expect("not an int")
-                }
+            let n: isize = std::str::from_utf8(bytes)
+                .expect("not utf8")
+                .parse()
+                .expect("not an int");
+
+            if sign_maybe.is_some() {
+                -n
             } else {
-                std::str::from_utf8(bytes)
-                    .expect("not utf8")
-                    .parse()
-                    .expect("not an int")
+                n
             }
         },
     )(s)?;
