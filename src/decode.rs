@@ -1,4 +1,4 @@
-use crate::Bencode;
+use crate::BencodeRef;
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take};
 use nom::character::complete::digit1;
@@ -8,14 +8,14 @@ use nom::sequence::{pair, preceded, terminated};
 use nom::*;
 use std::collections::BTreeMap;
 
-pub type DecodeResult<'a> = Result<Bencode, nom::error::Error<&'a [u8]>>;
+pub type DecodeResult<'a> = Result<BencodeRef<'a>, nom::error::Error<&'a [u8]>>;
 
 pub(crate) fn decode(b: &[u8]) -> DecodeResult {
     let (_s, o) = any(b).finish()?;
     Ok(o)
 }
 
-fn decode_string(s: &[u8]) -> IResult<&[u8], Bencode> {
+fn decode_string(s: &[u8]) -> IResult<&[u8], BencodeRef> {
     let (s, prefix) = map(digit1, |bytes| {
         let n: usize = std::str::from_utf8(bytes)
             .expect("not utf8")
@@ -27,10 +27,10 @@ fn decode_string(s: &[u8]) -> IResult<&[u8], Bencode> {
     let (s, _) = tag(":")(s)?;
     let (s, bytes) = take(prefix)(s)?;
 
-    Ok((s, Bencode::String(bytes.to_owned())))
+    Ok((s, BencodeRef::String(bytes)))
 }
 
-fn any(s: &[u8]) -> IResult<&[u8], Bencode> {
+fn any(s: &[u8]) -> IResult<&[u8], BencodeRef> {
     let (s, b) = complete(alt((
         decode_string,
         decode_integer,
@@ -41,7 +41,7 @@ fn any(s: &[u8]) -> IResult<&[u8], Bencode> {
     Ok((s, b))
 }
 
-fn decode_integer(s: &[u8]) -> IResult<&[u8], Bencode> {
+fn decode_integer(s: &[u8]) -> IResult<&[u8], BencodeRef> {
     let (s, int) = map(
         preceded(tag("i"), terminated(pair(opt(tag("-")), digit1), tag("e"))),
         |(sign_maybe, bytes): (Option<&[u8]>, &[u8])| {
@@ -58,24 +58,24 @@ fn decode_integer(s: &[u8]) -> IResult<&[u8], Bencode> {
         },
     )(s)?;
 
-    Ok((s, Bencode::Integer(int)))
+    Ok((s, BencodeRef::Integer(int)))
 }
 
-fn decode_list(s: &[u8]) -> IResult<&[u8], Bencode> {
+fn decode_list(s: &[u8]) -> IResult<&[u8], BencodeRef> {
     let (s, list) = preceded(tag("l"), terminated(many0(any), tag("e")))(s)?;
 
-    Ok((s, Bencode::List(list)))
+    Ok((s, BencodeRef::List(list)))
 }
 
-fn decode_dictionary(s: &[u8]) -> IResult<&[u8], Bencode> {
+fn decode_dictionary(s: &[u8]) -> IResult<&[u8], BencodeRef> {
     let (s, dict) = preceded(
         tag("d"),
         terminated(
             fold_many0(
                 pair(decode_string, any),
-                BTreeMap::new(),
+                BTreeMap::new,
                 |mut acc: BTreeMap<_, _>, (k, v)| {
-                    if let Bencode::String(s) = k {
+                    if let BencodeRef::String(s) = k {
                         acc.insert(s, v);
                         acc
                     } else {
@@ -87,7 +87,7 @@ fn decode_dictionary(s: &[u8]) -> IResult<&[u8], Bencode> {
         ),
     )(s)?;
 
-    Ok((s, Bencode::Dictionary(dict)))
+    Ok((s, BencodeRef::Dictionary(dict)))
 }
 
 #[cfg(test)]
@@ -95,7 +95,7 @@ mod tests {
     use std::io::Read;
 
     use super::*;
-    use Bencode::*;
+    use BencodeRef::*;
 
     macro_rules! btreemap {
         () => {
@@ -118,11 +118,11 @@ mod tests {
     fn string() {
         assert_eq!(
             decode_string(b"3:cow"),
-            Ok((vec![].as_bytes(), String(b"cow".to_vec())))
+            Ok((vec![].as_bytes(), String(b"cow")))
         );
         assert_eq!(
             decode_string(b"7:piglets"),
-            Ok((vec![].as_bytes(), String(b"piglets".to_vec())))
+            Ok((vec![].as_bytes(), String(b"piglets")))
         );
     }
 
@@ -158,7 +158,7 @@ mod tests {
             decode_dictionary(b"d3:cow7:pigletse"),
             Ok((
                 vec![].as_bytes(),
-                Dictionary(btreemap![b"cow".to_vec(), String(b"piglets".to_vec())])
+                Dictionary(btreemap![b"cow".as_ref(), String(b"piglets")])
             ))
         );
     }

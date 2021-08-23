@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
-use crate::Bencode;
+use crate::BencodeRef;
 
-pub(crate) fn encode(bencode: &Bencode) -> Vec<u8> {
+pub(crate) fn encode(bencode: &BencodeRef) -> Vec<u8> {
     let mut buf = vec![];
 
     do_encode(bencode, &mut buf);
@@ -10,12 +10,12 @@ pub(crate) fn encode(bencode: &Bencode) -> Vec<u8> {
     buf
 }
 
-fn do_encode(bencode: &Bencode, buf: &mut Vec<u8>) {
+fn do_encode(bencode: &BencodeRef, buf: &mut Vec<u8>) {
     match bencode {
-        Bencode::String(s) => encode_string(s, buf),
-        Bencode::Integer(i) => encode_integer(i, buf),
-        Bencode::List(l) => encode_list(l, buf),
-        Bencode::Dictionary(d) => encode_dictionary(d, buf),
+        BencodeRef::String(s) => encode_string(s, buf),
+        BencodeRef::Integer(i) => encode_integer(i, buf),
+        BencodeRef::List(l) => encode_list(l, buf),
+        BencodeRef::Dictionary(d) => encode_dictionary(d, buf),
     }
 }
 
@@ -32,7 +32,7 @@ fn encode_integer(i: &isize, buf: &mut Vec<u8>) {
     buf.push(b"e"[0]);
 }
 
-fn encode_list(l: &[Bencode], buf: &mut Vec<u8>) {
+fn encode_list(l: &[BencodeRef], buf: &mut Vec<u8>) {
     buf.push(b"l"[0]);
 
     for element in l {
@@ -42,7 +42,7 @@ fn encode_list(l: &[Bencode], buf: &mut Vec<u8>) {
     buf.push(b"e"[0]);
 }
 
-fn encode_dictionary(d: &BTreeMap<Vec<u8>, Bencode>, buf: &mut Vec<u8>) {
+fn encode_dictionary(d: &BTreeMap<&[u8], BencodeRef>, buf: &mut Vec<u8>) {
     buf.push(b"d"[0]);
 
     for (k, v) in d {
@@ -78,28 +78,28 @@ mod tests {
     fn string() {
         assert_eq!(
             b"5:hello".to_vec(),
-            encode(&crate::Bencode::String(b"hello".to_vec()))
+            encode(&crate::BencodeRef::String(b"hello"))
         )
     }
 
     #[test]
     fn integer() {
-        assert_eq!(b"i5e".to_vec(), encode(&crate::Bencode::Integer(5isize)));
-        assert_eq!(b"i-5e".to_vec(), encode(&crate::Bencode::Integer(-5isize)))
+        assert_eq!(b"i5e".to_vec(), encode(&crate::BencodeRef::Integer(5isize)));
+        assert_eq!(b"i-5e".to_vec(), encode(&crate::BencodeRef::Integer(-5isize)))
     }
 
     #[test]
     fn list() {
-        assert_eq!(b"le".to_vec(), encode(&crate::Bencode::List(vec![])));
+        assert_eq!(b"le".to_vec(), encode(&crate::BencodeRef::List(vec![])));
         assert_eq!(
             b"li5ee".to_vec(),
-            encode(&crate::Bencode::List(vec![crate::Bencode::Integer(5isize)]))
+            encode(&crate::BencodeRef::List(vec![crate::BencodeRef::Integer(5isize)]))
         );
         assert_eq!(
             b"li5e5:helloe".to_vec(),
-            encode(&crate::Bencode::List(vec![
-                crate::Bencode::Integer(5isize),
-                crate::Bencode::String(b"hello".to_vec())
+            encode(&crate::BencodeRef::List(vec![
+                crate::BencodeRef::Integer(5isize),
+                crate::BencodeRef::String(b"hello")
             ]))
         )
     }
@@ -108,25 +108,25 @@ mod tests {
     fn dictionary() {
         assert_eq!(
             b"de".to_vec(),
-            encode(&crate::Bencode::Dictionary(btreemap![]))
+            encode(&crate::BencodeRef::Dictionary(btreemap![]))
         );
         assert_eq!(
             b"d5:helloi5ee".to_vec(),
-            encode(&crate::Bencode::Dictionary(btreemap![
-                b"hello".to_vec(),
-                crate::Bencode::Integer(5isize)
+            encode(&crate::BencodeRef::Dictionary(btreemap![
+                b"hello".as_ref(),
+                crate::BencodeRef::Integer(5isize)
             ]))
         );
         assert_eq!(
             b"d5:applei9e4:betai-1e5:helloi5ee".to_vec(),
-            encode(&crate::Bencode::Dictionary(btreemap![
+            encode(&crate::BencodeRef::Dictionary(btreemap![
                 // according to the spec, keys shall appear in sorted order
-                b"beta".to_vec(),
-                crate::Bencode::Integer(-1),
-                b"hello".to_vec(),
-                crate::Bencode::Integer(5isize),
-                b"apple".to_vec(),
-                crate::Bencode::Integer(9isize)
+                b"beta".as_ref(),
+                crate::BencodeRef::Integer(-1),
+                b"hello".as_ref(),
+                crate::BencodeRef::Integer(5isize),
+                b"apple".as_ref(),
+                crate::BencodeRef::Integer(9isize)
             ]))
         )
     }
