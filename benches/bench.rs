@@ -15,16 +15,10 @@ fn ubuntu_ref(c: &mut Criterion) {
     });
 }
 
-fn ubuntu_owned(c: &mut Criterion) {
-    let mut torrent =
-        std::fs::File::open("./fixtures/ubuntu-14.04.4-desktop-amd64.iso.torrent").unwrap();
-
-    let mut buf = Vec::new();
-
-    torrent.read_to_end(&mut buf).unwrap();
-
-    c.bench_function("ubuntu_owned", move |b| {
-        b.iter(|| nom_bencode::decode(&buf).unwrap().to_owned())
+fn decode_string(c: &mut Criterion) {
+    let buf = b"8:abcdefgh";
+    c.bench_function("decode_string", move |b| {
+        b.iter(|| nom_bencode::decode(buf).unwrap())
     });
 }
 
@@ -35,5 +29,5 @@ fn decode_integer(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, ubuntu_ref, ubuntu_owned, decode_integer);
+criterion_group!(benches, ubuntu_ref, decode_string, decode_integer);
 criterion_main!(benches);
