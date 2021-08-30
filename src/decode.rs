@@ -1,4 +1,4 @@
-use crate::BencodeRef;
+use crate::Bencode;
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take};
 use nom::character::complete::digit1;
@@ -8,17 +8,19 @@ use nom::sequence::{pair, preceded, terminated};
 use nom::*;
 use std::collections::BTreeMap;
 
-pub type DecodeResult<'a> = Result<BencodeRef<'a>, nom::error::Error<&'a [u8]>>;
+pub type DecodeResult<'a> = Result<Bencode<'a>, nom::error::Error<&'a [u8]>>;
 
 pub(crate) fn decode(b: &[u8]) -> DecodeResult {
     let (_s, o) = any(b).finish()?;
     Ok(o)
 }
 
-fn decode_string(s: &[u8]) -> IResult<&[u8], BencodeRef> {
+fn decode_string(s: &[u8]) -> IResult<&[u8], Bencode> {
     let (s, prefix) = map(digit1, |bytes| {
+        // TODO verify whether or not this could use from_utf8_unchecked,
+        // and whether it's worth it
         let n: usize = std::str::from_utf8(bytes)
-            .expect("not utf8")
+            .expect("string prefix length must be valid utf8")
             .parse()
             .expect("not a number");
         n
@@ -27,10 +29,10 @@ fn decode_string(s: &[u8]) -> IResult<&[u8], BencodeRef> {
     let (s, _) = tag(":")(s)?;
     let (s, bytes) = take(prefix)(s)?;
 
-    Ok((s, BencodeRef::String(bytes)))
+    Ok((s, Bencode::String(bytes)))
 }
 
-fn any(s: &[u8]) -> IResult<&[u8], BencodeRef> {
+fn any(s: &[u8]) -> IResult<&[u8], Bencode> {
     let (s, b) = complete(alt((
         decode_string,
         decode_integer,
@@ -41,12 +43,14 @@ fn any(s: &[u8]) -> IResult<&[u8], BencodeRef> {
     Ok((s, b))
 }
 
-fn decode_integer(s: &[u8]) -> IResult<&[u8], BencodeRef> {
+fn decode_integer(s: &[u8]) -> IResult<&[u8], Bencode> {
     let (s, int) = map(
         preceded(tag("i"), terminated(pair(opt(tag("-")), digit1), tag("e"))),
         |(sign_maybe, bytes): (Option<&[u8]>, &[u8])| {
+            // TODO verify whether or not this could use from_utf8_unchecked,
+            // and whether it's worth it
             let n: isize = std::str::from_utf8(bytes)
-                .expect("not utf8")
+                .expect("integer digits must be valid utf8")
                 .parse()
                 .expect("not an int");
 
@@ -58,16 +62,16 @@ fn decode_integer(s: &[u8]) -> IResult<&[u8], BencodeRef> {
         },
     )(s)?;
 
-    Ok((s, BencodeRef::Integer(int)))
+    Ok((s, Bencode::Integer(int)))
 }
 
-fn decode_list(s: &[u8]) -> IResult<&[u8], BencodeRef> {
+fn decode_list(s: &[u8]) -> IResult<&[u8], Bencode> {
     let (s, list) = preceded(tag("l"), terminated(many0(any), tag("e")))(s)?;
 
-    Ok((s, BencodeRef::List(list)))
+    Ok((s, Bencode::List(list)))
 }
 
-fn decode_dictionary(s: &[u8]) -> IResult<&[u8], BencodeRef> {
+fn decode_dictionary(s: &[u8]) -> IResult<&[u8], Bencode> {
     let (s, dict) = preceded(
         tag("d"),
         terminated(
@@ -75,11 +79,11 @@ fn decode_dictionary(s: &[u8]) -> IResult<&[u8], BencodeRef> {
                 pair(decode_string, any),
                 BTreeMap::new,
                 |mut acc: BTreeMap<_, _>, (k, v)| {
-                    if let BencodeRef::String(s) = k {
+                    if let Bencode::String(s) = k {
                         acc.insert(s, v);
                         acc
                     } else {
-                        unreachable!("Non-string keys in dicts are illegal, so something is definitely worng with the given torrent file")
+                        unreachable!("Non-string keys in dicts are illegal, so something is definitely wrong with the given torrent file")
                     }
                 },
             ),
@@ -87,7 +91,7 @@ fn decode_dictionary(s: &[u8]) -> IResult<&[u8], BencodeRef> {
         ),
     )(s)?;
 
-    Ok((s, BencodeRef::Dictionary(dict)))
+    Ok((s, Bencode::Dictionary(dict)))
 }
 
 #[cfg(test)]
@@ -95,7 +99,7 @@ mod tests {
     use std::io::Read;
 
     use super::*;
-    use BencodeRef::*;
+    use Bencode::*;
 
     macro_rules! btreemap {
         () => {
