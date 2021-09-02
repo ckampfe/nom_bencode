@@ -1,16 +1,23 @@
 #![forbid(unsafe_code)]
 
-use std::collections::BTreeMap;
+use std::{borrow::Borrow, collections::BTreeMap};
 
 mod decode;
 mod encode;
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, Eq, Ord)]
+#[derive(Debug, PartialEq, PartialOrd, Eq, Ord)]
 pub enum Bencode<'a> {
     String(&'a [u8]),
     Integer(isize),
     List(Vec<Bencode<'a>>),
     Dictionary(BTreeMap<&'a [u8], Bencode<'a>>),
+}
+
+pub enum BencodeOwned {
+    String(Vec<u8>),
+    Integer(isize),
+    List(Vec<BencodeOwned>),
+    Dictionary(BTreeMap<Vec<u8>, BencodeOwned>),
 }
 
 type DecodeResult<'a> = decode::DecodeResult<'a>;
@@ -48,9 +55,9 @@ impl<'a> Bencode<'a> {
         }
     }
 
-    pub fn unwrap_list(&self) -> Vec<Bencode> {
+    pub fn unwrap_list(&self) -> &Vec<Bencode> {
         if let Self::List(v) = self {
-            v.to_owned()
+            v
         } else {
             panic!("Value must be a Bencode::List to unwrap as a Vec<Bencode>")
         }
@@ -61,6 +68,29 @@ impl<'a> Bencode<'a> {
             d
         } else {
             panic!("Value must be a Bencode::Dictionary to unwrap as BTreeMap<&[u8], Bencode>")
+        }
+    }
+}
+
+impl<'a> Borrow<Bencode<'a>> for BencodeOwned {
+    fn borrow(&self) -> &Bencode<'a> {
+        unimplemented!(
+            "This might be possible, but I can't figure out how to get it to typecheck yet."
+        )
+    }
+}
+
+impl<'a> ToOwned for Bencode<'a> {
+    type Owned = BencodeOwned;
+
+    fn to_owned(&self) -> Self::Owned {
+        match self {
+            Bencode::String(s) => BencodeOwned::String(s.to_vec()),
+            Bencode::Integer(i) => BencodeOwned::Integer(*i),
+            Bencode::List(v) => BencodeOwned::List(v.iter().map(|el| el.to_owned()).collect()),
+            Bencode::Dictionary(d) => BencodeOwned::Dictionary(
+                d.iter().map(|(k, v)| (k.to_vec(), v.to_owned())).collect(),
+            ),
         }
     }
 }
