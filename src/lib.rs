@@ -96,9 +96,68 @@ impl<'a> ToOwned for Bencode<'a> {
     }
 }
 
+#[macro_export]
+macro_rules! get_in {
+    ($bencode:expr, $($key:expr),*) => {
+        {
+            let mut r = Some(&$bencode);
+
+            $(
+                r = if let Some(Bencode::Dictionary(ref d)) = r {
+                    d.get($key)
+                } else {
+                    None
+                };
+            )*
+
+            r
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! get_in_owned {
+    ($bencode:expr, $($key:expr),*) => {
+        {
+            let mut r = Some(&$bencode);
+
+            $(
+                r = if let Some(BencodeOwned::Dictionary(ref d)) = r {
+                    d.get($key)
+                } else {
+                    None
+                };
+            )*
+
+            r
+        }
+    };
+}
+
 #[cfg(test)]
 mod tests {
     use std::io::Read;
+
+    use crate::Bencode;
+    use crate::BencodeOwned;
+
+    macro_rules! map {
+        () => {
+            crate::Map::new()
+        };
+        ($($key:expr, $value:expr),*) => {
+            {
+                use std::collections::BTreeMap;
+                let mut m = BTreeMap::new();
+
+                $(
+                    m.insert($key, $value);
+                )*
+
+                m
+            }
+        };
+    }
 
     #[test]
     fn roundtrip() {
@@ -115,5 +174,53 @@ mod tests {
 
         // and the reencoded for is the same as the original bytes
         assert_eq!(bencode.encode(), buf);
+    }
+
+    #[test]
+    fn get_in_owned_macro() {
+        let nested = BencodeOwned::Dictionary(map![
+            b"info".to_vec(),
+            BencodeOwned::Dictionary(map![
+                b"size".to_vec(),
+                BencodeOwned::Integer(8),
+                b"type".to_vec(),
+                BencodeOwned::String(b"torrent".to_vec()),
+                b"deeper".to_vec(),
+                BencodeOwned::Dictionary(map![b"secret".to_vec(), BencodeOwned::Integer(29)])
+            ])
+        ]);
+
+        let res = get_in_owned![
+            nested,
+            b"info".as_ref(),
+            b"deeper".as_ref(),
+            b"secret".as_ref()
+        ];
+
+        assert_eq!(res, Some(&BencodeOwned::Integer(29)));
+    }
+
+    #[test]
+    fn get_in_macro() {
+        let nested = Bencode::Dictionary(map![
+            b"info".as_ref(),
+            Bencode::Dictionary(map![
+                b"size".as_ref(),
+                Bencode::Integer(8),
+                b"type".as_ref(),
+                Bencode::String(b"torrent".as_ref()),
+                b"deeper".as_ref(),
+                Bencode::Dictionary(map![b"secret".as_ref(), Bencode::Integer(29)])
+            ])
+        ]);
+
+        let res = get_in![
+            nested,
+            b"info".as_ref(),
+            b"deeper".as_ref(),
+            b"secret".as_ref()
+        ];
+
+        assert_eq!(res, Some(&Bencode::Integer(29)));
     }
 }
