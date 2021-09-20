@@ -13,6 +13,7 @@ pub enum Bencode<'a> {
     Dictionary(BTreeMap<&'a [u8], Bencode<'a>>),
 }
 
+#[derive(Debug, PartialEq, PartialOrd, Eq, Ord)]
 pub enum BencodeOwned {
     String(Vec<u8>),
     Integer(isize),
