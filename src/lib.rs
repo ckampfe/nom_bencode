@@ -103,7 +103,7 @@ macro_rules! get_in {
             let mut r = Some(&$bencode);
 
             $(
-                r = if let Some(crate::Bencode::Dictionary(ref d)) = r {
+                r = if let Some($crate::Bencode::Dictionary(ref d)) = r {
                     d.get($key)
                 } else {
                     None
@@ -122,7 +122,7 @@ macro_rules! get_in_owned {
             let mut r = Some(&$bencode);
 
             $(
-                r = if let Some(crate::BencodeOwned::Dictionary(ref d)) = r {
+                r = if let Some($crate::BencodeOwned::Dictionary(ref d)) = r {
                     d.get($key)
                 } else {
                     None
