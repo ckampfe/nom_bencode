@@ -1,8 +1,8 @@
 use crate::Bencode;
+use atoi::{FromRadix10, FromRadix10Signed};
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take};
-use nom::character::complete::digit1;
-use nom::combinator::{complete, map, opt};
+use nom::combinator::complete;
 use nom::multi::{fold_many0, many0};
 use nom::sequence::{pair, preceded, terminated};
 use nom::*;
@@ -16,15 +16,14 @@ pub(crate) fn decode(b: &[u8]) -> DecodeResult {
 }
 
 fn decode_string(s: &[u8]) -> IResult<&[u8], Bencode> {
-    let (s, prefix) = map(digit1, |bytes| {
-        // TODO verify whether or not this could use from_utf8_unchecked,
-        // and whether it's worth it
-        let n: usize = std::str::from_utf8(bytes)
-            .expect("string prefix length must be valid utf8")
-            .parse()
-            .expect("not a number");
-        n
-    })(s)?;
+    let (prefix, rest_index) = usize::from_radix_10(s);
+    if prefix == 0 && rest_index == 0 {
+        return Err(nom::Err::Error(nom::error::Error {
+            input: s,
+            code: nom::error::ErrorKind::Digit,
+        }));
+    }
+    let s = &s[rest_index..];
 
     let (s, _) = tag(":")(s)?;
     let (s, bytes) = take(prefix)(s)?;
@@ -44,23 +43,16 @@ fn any(s: &[u8]) -> IResult<&[u8], Bencode> {
 }
 
 fn decode_integer(s: &[u8]) -> IResult<&[u8], Bencode> {
-    let (s, int) = map(
-        preceded(tag("i"), terminated(pair(opt(tag("-")), digit1), tag("e"))),
-        |(sign_maybe, bytes): (Option<&[u8]>, &[u8])| {
-            // TODO verify whether or not this could use from_utf8_unchecked,
-            // and whether it's worth it
-            let n: isize = std::str::from_utf8(bytes)
-                .expect("integer digits must be valid utf8")
-                .parse()
-                .expect("not an int");
-
-            if sign_maybe.is_some() {
-                -n
-            } else {
-                n
-            }
-        },
-    )(s)?;
+    let (s, _) = tag("i")(s)?;
+    let (int, rest_index) = isize::from_radix_10_signed(s);
+    if int == 0 && rest_index == 0 {
+        return Err(nom::Err::Error(nom::error::Error {
+            input: s,
+            code: nom::error::ErrorKind::Digit,
+        }));
+    }
+    let s = &s[rest_index..];
+    let (s, _) = tag("e")(s)?;
 
     Ok((s, Bencode::Integer(int)))
 }
