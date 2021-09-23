@@ -21,10 +21,8 @@ pub enum BencodeOwned {
     Dictionary(BTreeMap<Vec<u8>, BencodeOwned>),
 }
 
-type DecodeResult<'a> = decode::DecodeResult<'a>;
-
-pub fn decode(b: &[u8]) -> DecodeResult {
-    decode::decode(b)
+pub fn decode(bytes: &[u8]) -> Result<Bencode, nom::error::Error<&[u8]>> {
+    decode::decode(bytes)
 }
 
 impl<'a> Bencode<'a> {

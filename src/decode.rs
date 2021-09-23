@@ -2,15 +2,12 @@ use crate::Bencode;
 use atoi::{FromRadix10, FromRadix10Signed};
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take};
-use nom::combinator::complete;
 use nom::multi::{fold_many0, many0};
 use nom::sequence::{pair, preceded, terminated};
 use nom::*;
 use std::collections::BTreeMap;
 
-pub type DecodeResult<'a> = Result<Bencode<'a>, nom::error::Error<&'a [u8]>>;
-
-pub(crate) fn decode(b: &[u8]) -> DecodeResult {
+pub(crate) fn decode(b: &[u8]) -> Result<Bencode, nom::error::Error<&[u8]>> {
     let (_s, o) = any(b).finish()?;
     Ok(o)
 }
@@ -32,12 +29,12 @@ fn decode_string(s: &[u8]) -> IResult<&[u8], Bencode> {
 }
 
 fn any(s: &[u8]) -> IResult<&[u8], Bencode> {
-    let (s, b) = complete(alt((
+    let (s, b) = alt((
         decode_string,
         decode_integer,
         decode_list,
         decode_dictionary,
-    )))(s)?;
+    ))(s)?;
 
     Ok((s, b))
 }
