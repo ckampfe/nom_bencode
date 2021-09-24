@@ -2,6 +2,12 @@ use std::collections::BTreeMap;
 
 use crate::Bencode;
 
+const COLON_BYTE: u8 = b':';
+const D_BYTE: u8 = b'd';
+const E_BYTE: u8 = b'e';
+const I_BYTE: u8 = b'i';
+const L_BYTE: u8 = b'l';
+
 pub(crate) fn encode(bencode: &Bencode) -> Vec<u8> {
     let mut buf = vec![];
 
@@ -21,36 +27,36 @@ fn do_encode(bencode: &Bencode, buf: &mut Vec<u8>) {
 
 fn encode_string(s: &[u8], buf: &mut Vec<u8>) {
     let len = s.len();
-    buf.extend_from_slice(format!("{}", len).as_bytes());
-    buf.push(b":"[0]);
+    itoa::write(&mut *buf, len).unwrap();
+    buf.push(COLON_BYTE);
     buf.extend_from_slice(s);
 }
 
 fn encode_integer(i: &isize, buf: &mut Vec<u8>) {
-    buf.push(b"i"[0]);
-    buf.extend_from_slice(format!("{}", i).as_bytes());
-    buf.push(b"e"[0]);
+    buf.push(I_BYTE);
+    itoa::write(&mut *buf, *i).unwrap();
+    buf.push(E_BYTE);
 }
 
 fn encode_list(l: &[Bencode], buf: &mut Vec<u8>) {
-    buf.push(b"l"[0]);
+    buf.push(L_BYTE);
 
     for element in l {
         do_encode(element, buf);
     }
 
-    buf.push(b"e"[0]);
+    buf.push(E_BYTE);
 }
 
 fn encode_dictionary(d: &BTreeMap<&[u8], Bencode>, buf: &mut Vec<u8>) {
-    buf.push(b"d"[0]);
+    buf.push(D_BYTE);
 
     for (k, v) in d {
         encode_string(k, buf);
         do_encode(v, buf);
     }
 
-    buf.push(b"e"[0]);
+    buf.push(E_BYTE);
 }
 
 #[cfg(test)]
